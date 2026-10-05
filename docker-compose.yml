@@ -1,0 +1,170 @@
+# Ponte - ambiente completo local
+#   docker compose up --build
+#
+#   Console ............ http://localhost:3000   (API key demo: pk_test_ponte_demo_key_0000000000000000)
+#   Gateway ............ http://localhost:5100
+#   Swagger ............ http://localhost:5101/swagger (ingestion) | :5103/swagger (management)
+#   RabbitMQ ........... http://localhost:15672  (ponte / ponte)
+#   Jaeger (traces) .... http://localhost:16686
+#   Echo receiver ...... http://localhost:5199/received
+
+x-dotnet-env: &dotnet-env
+  ASPNETCORE_ENVIRONMENT: Development
+  RabbitMq__ConnectionString: amqp://ponte:ponte@rabbitmq:5672/
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+
+x-depends-infra: &depends-infra
+  postgres:
+    condition: service_healthy
+  sqlserver:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+
+services:
+  # --------------------------------------------------------------------------
+  # Infraestrutura
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    command: ["postgres", "-c", "max_connections=400", "-c", "shared_buffers=256MB"]
+    environment:
+      POSTGRES_USER: ponte
+      POSTGRES_PASSWORD: ponte
+      POSTGRES_DB: ponte
+    ports: ["5432:5432"]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ponte"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64 # em Mac com Apple Silicon roda via Rosetta
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: Ponte@12345
+      MSSQL_PID: Developer
+    ports: ["1433:1433"]
+    volumes: [sqlserver-data:/var/opt/mssql]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ponte
+      RABBITMQ_DEFAULT_PASS: ponte
+    ports: ["5672:5672", "15672:15672"]
+    volumes: [rabbitmq-data:/var/lib/rabbitmq]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["16686:16686"]
+
+  # --------------------------------------------------------------------------
+  # Servicos .NET
+  # --------------------------------------------------------------------------
+  ingestion:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      args:
+        PROJECT: src/Services/Ingestion/Ponte.Ingestion.Api/Ponte.Ingestion.Api.csproj
+        ASSEMBLY: Ponte.Ingestion.Api
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__IngestionDb: Host=postgres;Database=ponte_ingestion;Username=ponte;Password=ponte;Maximum Pool Size=100
+      RabbitMq__ClientName: ponte-ingestion
+    ports: ["5101:8080"]
+    depends_on: *depends-infra
+
+  delivery:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      args:
+        PROJECT: src/Services/Delivery/Ponte.Delivery.Api/Ponte.Delivery.Api.csproj
+        ASSEMBLY: Ponte.Delivery.Api
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__DeliveryDb: Host=postgres;Database=ponte_delivery;Username=ponte;Password=ponte;Maximum Pool Size=100
+      RabbitMq__ClientName: ponte-delivery
+      Webhooks__AllowPrivateNetworks: "true" # o echo-receiver esta na rede do compose
+    # Duas replicas consumindo as mesmas filas: competing consumers + lease/xmin evitando POST duplicado.
+    deploy:
+      replicas: 2
+    depends_on: *depends-infra
+
+  management:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      args:
+        PROJECT: src/Services/Management/Ponte.Management.Api/Ponte.Management.Api.csproj
+        ASSEMBLY: Ponte.Management.Api
+    environment:
+      <<: *dotnet-env
+      ConnectionStrings__ManagementDb: Server=sqlserver,1433;Database=ponte_management;User Id=sa;Password=Ponte@12345;TrustServerCertificate=True;Encrypt=False
+      RabbitMq__ClientName: ponte-management
+      Seed__Endpoints__0__Url: http://echo-receiver:8080/webhooks/pedidos?failRate=0.15&latencyMs=120
+      Seed__Endpoints__1__Url: http://echo-receiver:8080/webhooks/financeiro?failRate=0.6&latencyMs=600
+      Seed__Endpoints__2__Url: http://echo-receiver:8080/webhooks/data-lake
+    ports: ["5103:8080"]
+    depends_on: *depends-infra
+
+  gateway:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      args:
+        PROJECT: src/Gateway/Ponte.Gateway/Ponte.Gateway.csproj
+        ASSEMBLY: Ponte.Gateway
+    environment:
+      <<: *dotnet-env
+      Services__Management: http://management:8080
+      Cors__Origins__0: http://localhost:3000
+      Cors__Origins__1: http://localhost:5173
+      ReverseProxy__Clusters__ingestion__Destinations__ingestion-1__Address: http://ingestion:8080
+      ReverseProxy__Clusters__delivery__Destinations__delivery-1__Address: http://delivery:8080
+      ReverseProxy__Clusters__management__Destinations__management-1__Address: http://management:8080
+    ports: ["5100:8080"]
+    depends_on: [ingestion, delivery, management]
+
+  echo-receiver:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+      args:
+        PROJECT: src/Tools/Ponte.EchoReceiver/Ponte.EchoReceiver.csproj
+        ASSEMBLY: Ponte.EchoReceiver
+    ports: ["5199:8080"]
+
+  # --------------------------------------------------------------------------
+  # Console React
+  # --------------------------------------------------------------------------
+  console:
+    build:
+      context: web/ponte-console
+      args:
+        VITE_API_URL: http://localhost:5100
+    ports: ["3000:80"]
+    depends_on: [gateway]
+
+volumes:
+  postgres-data:
+  sqlserver-data:
+  rabbitmq-data:

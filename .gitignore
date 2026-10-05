@@ -1,0 +1,32 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+*.trx
+coverage*/
+
+# Node
+node_modules/
+dist/
+*.local
+.vite/
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Infra
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+
+# Env
+.env
+!.env.example
+.DS_Store

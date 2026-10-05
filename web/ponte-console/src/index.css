@@ -1,0 +1,129 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Ponte Console - "sala de controle": tinta escura esverdeada, sinal laranja.
+   Tokens em CSS vars para alternar claro/escuro sem duplicar utilitarios.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --bg: #0b1416;
+  --surface: #101c1f;
+  --surface-2: #162427;
+  --border: #213337;
+  --fg: #e6efed;
+  --muted: #89a09c;
+  --accent: #ff8a3d;
+  --accent-fg: #1a0d04;
+  --success: #3ddc97;
+  --warning: #f5c451;
+  --danger: #ff5d6c;
+  --info: #6cc4ff;
+  --grid: rgba(137, 160, 156, 0.08);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f3f0e8;
+    --surface: #fffdf7;
+    --surface-2: #f7f3ea;
+    --border: #e2dccd;
+    --fg: #10201e;
+    --muted: #5d6f6b;
+    --accent: #df5f17;
+    --accent-fg: #fff7f0;
+    --success: #12985f;
+    --warning: #b7820b;
+    --danger: #d23847;
+    --info: #1f7fc0;
+    --grid: rgba(16, 32, 30, 0.06);
+    color-scheme: light;
+  }
+}
+
+:root[data-theme='light'] {
+  --bg: #f3f0e8;
+  --surface: #fffdf7;
+  --surface-2: #f7f3ea;
+  --border: #e2dccd;
+  --fg: #10201e;
+  --muted: #5d6f6b;
+  --accent: #df5f17;
+  --accent-fg: #fff7f0;
+  --success: #12985f;
+  --warning: #b7820b;
+  --danger: #d23847;
+  --info: #1f7fc0;
+  --grid: rgba(16, 32, 30, 0.06);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pulse-dot {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 60%, transparent); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.live-dot {
+  animation: pulse-dot 1.8s ease-out infinite;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.feed-item {
+  animation: slide-in 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot,
+  .feed-item {
+    animation: none;
+  }
+}

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Ponte.EchoReceiver</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\Ponte.BuildingBlocks\Ponte.BuildingBlocks.csproj" />
+  </ItemGroup>
+</Project>
