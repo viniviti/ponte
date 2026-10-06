@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { getDemoEngine } from '../demo/engine'
 import { clearSettings, createApi, loadSettings, saveSettings, type Api, type ConsoleSettings } from './client'
 
 interface SessionValue {
@@ -24,11 +25,17 @@ export function SessionProvider({ children, initial }: { children: ReactNode; in
   }, [])
 
   const value = useMemo<SessionValue>(
-    () => ({ settings, api: settings ? createApi(settings) : null, connect, disconnect }),
+    () => ({ settings, api: settings ? apiFor(settings) : null, connect, disconnect }),
     [settings, connect, disconnect],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+}
+
+function apiFor(settings: ConsoleSettings): Api {
+  if (!settings.demo) return createApi(settings)
+  const engine = getDemoEngine()
+  return (path, options) => engine.request(path, options)
 }
 
 export function useSession(): SessionValue {

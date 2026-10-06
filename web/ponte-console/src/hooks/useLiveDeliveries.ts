@@ -2,6 +2,7 @@ import { HubConnectionBuilder, HubConnectionState, LogLevel, type HubConnection 
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useSession } from '../api/session'
+import { getDemoEngine } from '../demo/engine'
 import type { LiveDeliveryAttempt } from '../api/types'
 
 export type LiveState = 'connecting' | 'live' | 'reconnecting' | 'offline'
@@ -23,6 +24,27 @@ export function useLiveDeliveries() {
   useEffect(() => {
     if (!settings) return
 
+    const onAttempt = (attempt: LiveDeliveryAttempt) => {
+      setFeed((current) => [attempt, ...current].slice(0, MAX_FEED))
+
+      clearTimeout(refreshTimer.current)
+      refreshTimer.current = setTimeout(() => {
+        void client.invalidateQueries({ queryKey: ['deliveries'] })
+        void client.invalidateQueries({ queryKey: ['stats'] })
+        void client.invalidateQueries({ queryKey: ['endpoints'] })
+      }, 1500)
+    }
+
+    if (settings.demo) {
+      // Na demonstracao o "RabbitMQ" e o motor simulado no proprio navegador.
+      setState('live')
+      const unsubscribe = getDemoEngine().subscribe(onAttempt)
+      return () => {
+        unsubscribe()
+        clearTimeout(refreshTimer.current)
+      }
+    }
+
     const connection: HubConnection = new HubConnectionBuilder()
       .withUrl(`${settings.apiUrl.replace(/\/+$/, '')}/hubs/deliveries`, {
         accessTokenFactory: () => settings.apiKey,
@@ -31,15 +53,7 @@ export function useLiveDeliveries() {
       .configureLogging(LogLevel.Warning)
       .build()
 
-    connection.on('DeliveryAttempted', (attempt: LiveDeliveryAttempt) => {
-      setFeed((current) => [attempt, ...current].slice(0, MAX_FEED))
-
-      clearTimeout(refreshTimer.current)
-      refreshTimer.current = setTimeout(() => {
-        void client.invalidateQueries({ queryKey: ['deliveries'] })
-        void client.invalidateQueries({ queryKey: ['stats'] })
-      }, 1500)
-    })
+    connection.on('DeliveryAttempted', onAttempt)
 
     connection.onreconnecting(() => setState('reconnecting'))
     connection.onreconnected(() => setState('live'))

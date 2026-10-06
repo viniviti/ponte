@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Activity, KeyRound, LayoutDashboard, LogOut, Moon, Send, Sun, Webhook } from 'lucide-react'
+import { Activity, FlaskConical, KeyRound, LayoutDashboard, LogOut, Moon, Send, Sun, Webhook } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useOutletContext } from 'react-router-dom'
 import { useTenant } from '../api/hooks'
@@ -27,7 +27,7 @@ export function useLive(): LiveContext {
 export function Layout() {
   const live = useLiveDeliveries()
   const tenant = useTenant()
-  const { disconnect } = useSession()
+  const { disconnect, settings } = useSession()
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
@@ -76,9 +76,33 @@ export function Layout() {
 
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8">
         <div className="mx-auto max-w-6xl">
+          {settings?.demo && <DemoBanner onExit={disconnect} />}
           <Outlet context={live satisfies LiveContext} />
         </div>
       </main>
+    </div>
+  )
+}
+
+const REPO_URL = 'https://github.com/viniviti/ponte'
+
+function DemoBanner({ onExit }: { onExit: () => void }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-accent/40 bg-accent/10 px-4 py-3 text-sm">
+      <FlaskConical className="size-4 shrink-0 text-accent" aria-hidden />
+      <p className="min-w-0 flex-1">
+        <span className="font-medium">Modo demonstração.</span>{' '}
+        <span className="text-muted">
+          Os dados são simulados no seu navegador com as mesmas regras do backend (fan-out, retry exponencial, DLQ). Para o sistema completo
+          com .NET, RabbitMQ, PostgreSQL e SQL Server, rode <code className="font-mono text-fg">docker compose up</code>.
+        </span>
+      </p>
+      <a href={REPO_URL} target="_blank" rel="noreferrer" className="font-medium text-accent underline-offset-2 hover:underline">
+        Ver no GitHub
+      </a>
+      <button type="button" onClick={onExit} className="text-muted underline-offset-2 hover:text-fg hover:underline">
+        Conectar a um gateway
+      </button>
     </div>
   )
 }

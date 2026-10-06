@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { createApi, DEMO_API_KEY, defaultSettings } from '../api/client'
+import { createApi, DEMO_API_KEY, DEMO_SETTINGS, defaultSettings } from '../api/client'
 import { useSession } from '../api/session'
 import { BridgeMark } from '../components/Layout'
 import { Button, ErrorNotice, Field, inputClass } from '../components/ui'
@@ -57,6 +57,14 @@ export function ConnectPage() {
           <ErrorNotice error={error} />
           <Button type="submit" variant="primary" className="w-full" loading={checking}>
             Conectar
+          </Button>
+          <div className="flex items-center gap-3 text-xs text-muted">
+            <span className="h-px flex-1 bg-line" />
+            ou
+            <span className="h-px flex-1 bg-line" />
+          </div>
+          <Button type="button" className="w-full" onClick={() => connect(DEMO_SETTINGS)}>
+            Explorar a demonstração (sem backend)
           </Button>
         </div>
       </form>

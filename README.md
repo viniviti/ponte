@@ -186,7 +186,9 @@ Onde cada requisito aparece no código:
 
 ## Como rodar
 
-Pré-requisito: Docker.
+**Sem instalar nada:** o console publicado (Vercel) abre em **modo demonstração**, com um backend simulado no navegador que segue as mesmas regras do sistema real (fan-out por padrão de evento, retry 5s/30s/2m/10m/1h/6h, entregas mortas e replay, feed ao vivo). Localmente, a demo também fica disponível na tela de conexão.
+
+**Sistema completo.** Pré-requisito: Docker.
 
 ```bash
 git clone https://github.com/viniviti/ponte.git

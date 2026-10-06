@@ -5,22 +5,38 @@ const SETTINGS_KEY = 'ponte.console.settings'
 export interface ConsoleSettings {
   apiUrl: string
   apiKey: string
+  /** Modo demonstracao: backend simulado no navegador (ex.: deploy estatico na Vercel). */
+  demo?: boolean
 }
 
 export const DEMO_API_KEY = 'pk_test_ponte_demo_key_0000000000000000'
 
-const defaultApiUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:5100'
+const configuredApiUrl = import.meta.env.VITE_API_URL as string | undefined
+const defaultApiUrl = configuredApiUrl ?? 'http://localhost:5100'
+
+export const DEMO_SETTINGS: ConsoleSettings = { apiUrl: 'demo', apiKey: 'demo', demo: true }
+
+/**
+ * Publicado sem backend (nenhum VITE_API_URL e fora de localhost): abre direto na
+ * demonstracao, em vez de uma tela de conexao que o visitante nao tem como usar.
+ */
+export function shouldStartInDemo(hostname: string = globalThis.location?.hostname ?? 'localhost'): boolean {
+  return !configuredApiUrl && !['localhost', '127.0.0.1', '[::1]'].includes(hostname)
+}
 
 export function loadSettings(): ConsoleSettings | null {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<ConsoleSettings>
-    if (!parsed.apiKey) return null
-    return { apiUrl: parsed.apiUrl || defaultApiUrl, apiKey: parsed.apiKey }
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<ConsoleSettings>
+      if (parsed.demo) return DEMO_SETTINGS
+      // Escolha explicita salva (inclusive "saiu da demo"): respeita e nao reabre sozinho.
+      return parsed.apiKey ? { apiUrl: parsed.apiUrl || defaultApiUrl, apiKey: parsed.apiKey } : null
+    }
   } catch {
-    return null
+    // storage indisponivel: segue o fluxo padrao
   }
+  return shouldStartInDemo() ? DEMO_SETTINGS : null
 }
 
 export function saveSettings(settings: ConsoleSettings): void {
@@ -33,7 +49,8 @@ export function saveSettings(settings: ConsoleSettings): void {
 
 export function clearSettings(): void {
   try {
-    localStorage.removeItem(SETTINGS_KEY)
+    // Marca "saiu" explicitamente para nao reabrir a demo sozinho no proximo acesso.
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ apiKey: '' }))
   } catch {
     // ignora
   }
